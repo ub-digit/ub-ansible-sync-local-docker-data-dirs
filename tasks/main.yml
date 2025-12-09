@@ -32,5 +32,13 @@
     path: '{{ [playbook_dir, local_docker_directory, item.value.path | basename] | path_join }}'
     owner: '{{ item.value.owner | default(omit) }}'
     group: '{{ item.value.group | default(omit) }}'
-    mode: "{{ item.value.mode | default('0755') }}" # hmm?
+    mode: "{{ item.value.mode | default('0750') }}"
   loop: "{{ data_dirs | dict2items | rejectattr('value.pull') }}"
+
+# TODO: Perhaps should instead check which services where runing before and start only those
+# also, perhaps this probably not be done here as an unexpected side effect, but leaving for now
+- name: Ensure services are up
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: '{{ docker_command }} up -d'
+    chdir: '{{ [playbook_dir, local_docker_directory] | path_join }}'
