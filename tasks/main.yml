@@ -1,9 +1,23 @@
 ---
-- name: Ensure services are down
+
+- name: Set facts
+  ansible.builtin.set_fact:
+    local_docker_directory_path: '{{ [playbook_dir, local_docker_directory] | path_join }}'
+
+- name: Register currently running services
   delegate_to: localhost
   ansible.builtin.command:
-    cmd: '{{ docker_command }} down'
-    chdir: '{{ [playbook_dir, local_docker_directory] | path_join }}'
+    cmd: '{{ docker_command }} ps --services'
+    chdir: '{{ local_docker_directory_path }}'
+  register: running_services
+  changed_when: false
+
+- name: Ensure services are stopped
+  delegate_to: localhost
+  ansible.builtin.command:
+    cmd: '{{ docker_command }} stop'
+    chdir: '{{ local_docker_directory_path }}'
+  when: running_services.stdout_lines | length > 0
 
 - name: Set facts
   ansible.builtin.set_fact:
@@ -41,10 +55,9 @@
   loop:  "{{ precreated_data_dirs }}"
   when: item.value.local | default(true)
 
-#  TODO: Perhaps should instead check which services where runing before and start only those
-# also, perhaps this probably not be done here as an unexpected side effect, but leaving for now
-- name: Ensure services are up
+- name: Ensure services are started
   delegate_to: localhost
   ansible.builtin.command:
-    cmd: '{{ docker_command }} up -d'
-    chdir: '{{ [playbook_dir, local_docker_directory] | path_join }}'
+    cmd: "{{ docker_command }} start {{ running_services.stdout_lines | join(' ') }}"
+    chdir: '{{ local_docker_directory_path }}'
+  when: running_services.stdout_lines | length > 0
